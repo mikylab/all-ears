@@ -3,3 +3,5 @@ __pycache__/
 EarVN1.0/
 
 d2l.py
+
+best_model.pth
