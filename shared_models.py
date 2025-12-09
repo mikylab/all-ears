@@ -1,3 +1,7 @@
+import torch
+from torch import nn
+
+
 class CNNbaseline(d2l.Classifier):
     """The LeNet-5 model."""
     def __init__(self, num_classes=164):
