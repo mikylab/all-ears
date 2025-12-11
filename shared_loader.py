@@ -14,7 +14,6 @@ class EarData(d2l.DataModule):
         self.save_hyperparameters()
 
         transform = d2l.transforms.Compose([d2l.transforms.Resize(resize), d2l.transforms.ToTensor()])
-
         data = []
         self.names = []
 
@@ -58,9 +57,6 @@ class PairedEarData(d2l.DataModule):
 
         transform = d2l.transforms.Compose([d2l.transforms.Resize(resize), d2l.transforms.ToTensor()])
 
-        self.train = []
-        self.val = []
-
         images = []
         last_person_index = -1
 
@@ -71,44 +67,65 @@ class PairedEarData(d2l.DataModule):
 
         for index, ear_folder_name in enumerate(ear_folders):
             ear_folder = images_folder + "/" + ear_folder_name
-
             for image_name in os.listdir(ear_folder):
                 with Image.open(ear_folder + "/" + image_name) as image:
                     transformed_image = transform(image)
                     images.append((transformed_image, index))
 
-            last_person_index = index
-
         # splitting by person to prevent leakage between sets
-        person_split = int(train_split_size * last_person_index)
-        positive = 0
-        negative = 0
+        person_split = int(train_split_size * len(ear_folders))
+        train_positive = []
+        train_negative = []
+        val_positive = []
+        val_negative = []
 
         for i in range(len(images)):
             image1, person_index1 = images[i]
 
-            for j in range(1, len(images)):
+            for j in range(i + 1, len(images)):
                 image2, person_index2 = images[j]
                 image_pair = image1, image2
+
                 label = int(person_index1 == person_index2)
+                train = person_index1 < person_split and person_index2 < person_split
+                val = person_index1 >= person_split and person_index2 >= person_split
 
                 if label == 1:
-                    if random.random() > 0.016:
+                    if random.random() > 0.015:
                         continue
-                    positive += 1
                 else:
                     # there will significantly more negative examples without sampling less
-                    if random.random() > 0.0001:
+                    if random.random() > 0.0002:
                         continue
-                    negative += 1
 
-                if person_index1 < person_split:
-                    self.train.append((image_pair, label))
+                if train:
+                    if label == 1:
+                        train_positive.append((image_pair, label))
+                    else:
+                        train_negative.append((image_pair, label))
+                elif val:
+                    if label == 1:
+                        val_positive.append((image_pair, label))
+                    else:
+                        val_negative.append((image_pair, label))
                 else:
-                    self.val.append((image_pair, label))
+                    # one of the images would leak into the wrong set if
+                    # we go down this branch
+                    continue
 
-        print(f"{positive=}")
-        print(f"{negative=}")
+        print(f"train_positive={len(train_positive)}")
+        print(f"train_negative={len(train_negative)}")
+        print(f"val_positive={len(val_positive)}")
+        print(f"val_negative={len(val_negative)}")
+
+        # truncating to not imbalance classes, can remove this
+        length = min(len(train_positive), len(train_negative))
+        self.train = train_positive[:length] + train_negative[:length]
+        length = min(len(val_positive), len(val_negative))
+        self.val = val_positive[:length] + val_negative[:length]
+
+        print(f"train={len(self.train)}")
+        print(f"val={len(self.val)}")
 
     def get_dataloader(self, train=True):
         data = self.train if train else self.val
