@@ -58,45 +58,64 @@ class PairedEarData(d2l.DataModule):
 
         transform = d2l.transforms.Compose([d2l.transforms.Resize(resize), d2l.transforms.ToTensor()])
 
-        data = []
+        self.train = []
+        self.val = []
 
-        extra_images = []
+        images = []
+        last_person_index = -1
 
         images_folder = "EarVN1.0/Images"
-        for ear_folder_name in sorted(os.listdir(images_folder)):
-            parts = ear_folder_name.split(".")
-            _, name = parts
+        ear_folders = os.listdir(images_folder)
+        # shuffling so that doing a split off person index doesn't only split off one gender
+        random.shuffle(ear_folders)
 
-            images = []
+        for index, ear_folder_name in enumerate(ear_folders):
             ear_folder = images_folder + "/" + ear_folder_name
+
             for image_name in os.listdir(ear_folder):
                 with Image.open(ear_folder + "/" + image_name) as image:
                     transformed_image = transform(image)
-                    images.append(transformed_image)
-            random.shuffle(images)
+                    images.append((transformed_image, index))
 
-            half = len(images) // 2
-            pairs = zip(images[:half:2], images[1:half:2])
-            for pair in pairs:
-                data.append((pair, 1))
+            last_person_index = index
 
-            extra_images.append(images[half:])
+        # splitting by person to prevent leakage between sets
+        person_split = int(train_split_size * last_person_index)
+        positive = 0
+        negative = 0
 
-        half = len(extra_images) // 2
-        pairs = zip(extra_images[:half:2], extra_images[1:half:2])
-        for pair in pairs:
-            data.append((pair, 0))
+        for i in range(len(images)):
+            image1, person_index1 = images[i]
 
-        split = int(len(data) * train_split_size)
-        self.train = data[:split]
-        self.val = data[split:]
+            for j in range(1, len(images)):
+                image2, person_index2 = images[j]
+                image_pair = image1, image2
+                label = int(person_index1 == person_index2)
+
+                if label == 1:
+                    if random.random() > 0.016:
+                        continue
+                    positive += 1
+                else:
+                    # there will significantly more negative examples without sampling less
+                    if random.random() > 0.0001:
+                        continue
+                    negative += 1
+
+                if person_index1 < person_split:
+                    self.train.append((image_pair, label))
+                else:
+                    self.val.append((image_pair, label))
+
+        print(f"{positive=}")
+        print(f"{negative=}")
 
     def get_dataloader(self, train=True):
         data = self.train if train else self.val
         return torch.utils.data.DataLoader(data, self.batch_size, shuffle=train)
 
     def get_label(self, class_value):
-        return "same" if class_value == 1 else "different"
+        return "positive" if class_value == 1 else "negative"
 
     def visualize(self, batch):
         (X_1, X_2), y = batch
