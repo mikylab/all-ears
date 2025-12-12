@@ -33,9 +33,7 @@ class PairCNN(d2l.Classifier):
             nn.LazyConv2d(6, kernel_size=5, padding=2), nn.LazyBatchNorm2d(), nn.ReLU(),
             nn.MaxPool2d(kernel_size=2, stride=2),
             nn.LazyConv2d(16, kernel_size=5), nn.LazyBatchNorm2d(), nn.ReLU(),
-            nn.MaxPool2d(kernel_size=2, stride=2),
-            nn.LazyConv2d(32, kernel_size=5, padding=2), nn.LazyBatchNorm2d(), nn.ReLU(),
-            nn.MaxPool2d(kernel_size=2, stride=2),
+            nn.MaxPool2d(kernel_size=2, stride=2)
         )
         self.flatten = nn.Flatten()
         self.fc = nn.Sequential(
@@ -54,18 +52,26 @@ class PairCNN(d2l.Classifier):
 
 
 class PairResnet18(d2l.Classifier):
-    def __init__(self):
+    def __init__(self, pretrained=True):
         super().__init__()
         self.save_hyperparameters()
 
-        self.resnet = torchvision.models.resnet18(weights='IMAGENET1K_V1')
+        if pretrained:
+            self.resnet = torchvision.models.resnet18(weights='IMAGENET1K_V1')
+        else:
+            self.resnet = torchvision.models.resnet18()
         fc_in_features = self.resnet.fc.in_features
         # remove the last layer so that we can combine the output from two images
         # before passing through the fully connected layer
         self.resnet = torch.nn.Sequential(*(list(self.resnet.children())[:-1]))
 
         self.flatten = nn.Flatten()
-        self.fc = nn.Linear(fc_in_features * 2, 1)
+        # the pytorch siamese network page I referenced did this
+        # (two linear layers), so I figured it was worth a shot
+        self.fc = nn.Sequential(
+            nn.Linear(fc_in_features * 2, 256), nn.ReLU(), nn.Dropout(0.5),
+            nn.Linear(256, 1)
+        )
         self.sigmoid = nn.Sigmoid()
 
     def forward(self, X_1, X_2):

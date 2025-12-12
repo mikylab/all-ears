@@ -91,11 +91,11 @@ class PairedEarData(d2l.DataModule):
                 val = person_index1 >= person_split and person_index2 >= person_split
 
                 if label == 1:
-                    if random.random() > 0.015:
+                    if random.random() > 0.03:
                         continue
                 else:
                     # there will significantly more negative examples without sampling less
-                    if random.random() > 0.0002:
+                    if random.random() > 0.0004:
                         continue
 
                 if train:
