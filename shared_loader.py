@@ -6,6 +6,7 @@ from PIL import Image
 import torch
 from torch import nn
 import random
+from torchvision import transforms
 
 
 class EarData(d2l.DataModule):
