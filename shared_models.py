@@ -19,6 +19,29 @@ class CNNbaseline(d2l.Classifier):
             nn.LazyLinear(84), nn.ReLU(), nn.Dropout(0.5),
             nn.LazyLinear(num_classes))
 
+class CNNmodified(d2l.Classifier):
+    """ Additional Convolution Layers, BatchNorm, and keeps dropout """
+    def __init__(self, num_classes=2):
+        super().__init__()
+        self.save_hyperparameters()
+        self.net = nn.Sequential(
+            nn.LazyConv2d(6, kernel_size=5, padding=2), nn.LazyBatchNorm2d(), nn.ReLU(),
+            nn.MaxPool2d(kernel_size=2, stride=2),
+            
+            nn.LazyConv2d(16, kernel_size=5), nn.LazyBatchNorm2d(), nn.ReLU(),
+            nn.MaxPool2d(kernel_size=2, stride=2),
+            
+            nn.LazyConv2d(32, kernel_size=5, padding=2), nn.LazyBatchNorm2d(), nn.ReLU(),
+            nn.MaxPool2d(kernel_size=2, stride=2),
+
+            nn.LazyConv2d(64, kernel_size=5, padding=2), nn.LazyBatchNorm2d(), nn.ReLU(),
+            nn.MaxPool2d(kernel_size=2, stride=2),
+            
+            nn.Flatten(),
+            nn.LazyLinear(120), nn.LazyBatchNorm1d(), nn.ReLU(), nn.Dropout(0.5), 
+            nn.LazyLinear(84), nn.LazyBatchNorm1d(), nn.ReLU(), nn.Dropout(0.5), 
+            nn.LazyLinear(num_classes), 
+        )
 
 # This source showed a way to set up these classifiers for a simple siamese network
 # I mean simple since it uses BCELoss instead of making triplets
