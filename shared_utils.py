@@ -5,7 +5,7 @@ import torch
 from torch import nn
 from sklearn.metrics import confusion_matrix
 from sklearn.metrics import ConfusionMatrixDisplay 
-
+import pandas as pd
 
 device = (
     "cuda"
@@ -205,3 +205,18 @@ def confusionMatrix(data, model, device):
     fig, ax = plt.subplots(figsize=(4, 4))
     disp.plot(ax=ax, include_values=True, cmap=plt.cm.Blues, xticks_rotation="vertical");
 
+def generate_df(images_folder= "EarVN1.0/Images"):
+    column_names = ['Path', 'Person_Label', 'Name', 'Gender']
+    data_df = pd.DataFrame(columns=column_names)
+    
+    # images_folder = "EarVN1.0/Images"
+    for ear_folder_name in sorted(os.listdir(images_folder)):
+        parts = ear_folder_name.split(".")
+        label, name = parts
+        gender = 0 if int(label) <= 98 else 1
+    
+        ear_folder = images_folder + "/" + ear_folder_name
+        for i, image_name in enumerate(os.listdir(ear_folder)):
+            new_row = pd.DataFrame([{'Path': ear_folder_name + "/" + image_name, 'Person_Label': int(label)-1, 'Name': name, 'Gender': gender}])
+            data_df = pd.concat([data_df, new_row],ignore_index=True)
+    data_df.to_csv('EarData_df.csv')
