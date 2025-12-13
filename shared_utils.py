@@ -183,7 +183,7 @@ def bc_confusion_matrix(data, model, device):
     disp.plot(ax=ax, include_values=True, cmap=plt.cm.Blues, xticks_rotation="vertical")
     
 
-def confusionMatrix (data, model, device):
+def confusionMatrix(data, model, device):
     test_iter = data.get_dataloader(train=False)
     predictions = []
     ys = []
