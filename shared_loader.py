@@ -8,32 +8,75 @@ from torch import nn
 import random
 from torchvision import transforms
 
+from torch.utils.data import Dataset
+import torchvision.io as io
+from sklearn.model_selection import train_test_split
+
+class EarDataset(Dataset):
+    def __init__(self, data_frame, img_dir, classLabel = 1, transform=None, target_transform=None):
+        self.img_labels = data_frame #pd.read_csv(annotations_file)
+        self.img_dir = img_dir
+        self.transform = transform
+        self.target_transform = target_transform
+        self.classLabel = classLabel
+    def __len__(self):
+        return len(self.img_labels)
+
+    def __getitem__(self, idx):
+        img_path = os.path.join(self.img_dir, self.img_labels.iloc[idx, 0])
+        #image = io.read_image(img_path)
+        image = Image.open(img_path)
+        label = self.img_labels.iloc[idx, self.classLabel]
+        if self.transform:
+            image = self.transform(image)
+        if self.target_transform:
+            label = self.target_transform(label)
+        return image, label
+    
 
 class EarData(d2l.DataModule):
-    def __init__(self, batch_size=64, resize=(128, 128), train_split_size=0.7):
+    def __init__(self, data_set, class_label = 1, augmentations = False, batch_size=64, resize=(128, 128), train_split_size=0.7):
         super().__init__()
         self.save_hyperparameters()
+        self.class_label = class_label
+        train_df, test_df = train_test_split(
+                data_set,
+                test_size=1-train_split_size,
+                stratify=data_set.iloc[:, self.class_label],  
+                random_state=42
+            ) 
+        
+        random_transforms = [transforms.ColorJitter(brightness=.5, hue=.2), 
+                            transforms.GaussianBlur(kernel_size=(5, 9), sigma=(0.1, 5))
+                            ]
+        transform= transforms.transforms.Compose([transforms.transforms.Resize(resize),
+                                           transforms.RandomHorizontalFlip(p=0.5),
+                                           transforms.RandomVerticalFlip(p=0.5),
+                                           transforms.RandomApply(transforms=random_transforms, p=0.5), 
+                                           transforms.RandomPerspective(distortion_scale=0.4, p=.25),
+                                           transforms.transforms.ToTensor()])
+        transform_valid = transforms.transforms.Compose([transforms.transforms.Resize(resize),
+                                            transforms.transforms.ToTensor()])
 
-        transform = d2l.transforms.Compose([d2l.transforms.Resize(resize), d2l.transforms.ToTensor()])
-        data = []
-        self.names = []
+        
+        if augmentations:
+            self.train = EarDataset(train_df, "EarVN1.0/Images", classLabel=self.class_label, transform = transform)
+        else:
+            self.train = EarDataset(train_df, "EarVN1.0/Images", classLabel=self.class_label, transform = transform_valid)
+        self.val = EarDataset(test_df, "EarVN1.0/Images", classLabel=self.class_label, transform = transform_valid)
 
-        images_folder = "EarVN1.0/Images"
-        for ear_folder_name in sorted(os.listdir(images_folder)):
-            parts = ear_folder_name.split(".")
-            label, name = parts
-            label = int(label) - 1
-            self.names.append(name)
+    def get_dataloader(self, train=True):
+        data = self.train if train else self.val
+        return torch.utils.data.DataLoader(data, self.batch_size, shuffle=train)
 
-            ear_folder = images_folder + "/" + ear_folder_name
-            for image_name in os.listdir(ear_folder):
-                with Image.open(ear_folder + "/" + image_name) as image:
-                    transformed_image = transform(image)
-                    data.append((transformed_image, label))
-
-        split = int(len(data) * train_split_size)
-        self.train = data[:split]
-        self.val = data[split:]
+    def visualize(self, train, index = 0):
+        data = self.train if train else self.val
+        image, label = data[index]
+        plt.imshow(image.permute(1, 2, 0).numpy())
+        plt.title(f"Label: {label}")
+        plt.axis('off')
+        plt.show()
+        
 
     def text_labels(self, indices):
         return [self.names[i] for i in indices]
